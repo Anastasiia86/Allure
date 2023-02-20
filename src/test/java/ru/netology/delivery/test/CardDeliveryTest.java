@@ -1,59 +1,70 @@
 package ru.netology.delivery.test;
 
+
 import com.codeborne.selenide.Condition;
-import com.codeborne.selenide.Configuration;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
+import com.codeborne.selenide.logevents.SelenideLogger;
+import io.qameta.allure.selenide.AllureSelenide;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.Keys;
 import ru.netology.delivery.data.DataGenerator;
-import ru.netology.delivery.domain.UserInfo;
+
 
 import java.time.Duration;
 
-import static com.codeborne.selenide.Selenide.$;
-import static com.codeborne.selenide.Selenide.open;
+import static com.codeborne.selenide.Selenide.*;
 
-class CardDeliveryTest {
+public class CardDeliveryTest {
 
-    @BeforeEach
-    public void setup() {
-        Configuration.holdBrowserOpen = true;
-        open("http://localhost:9999");
+    @BeforeAll
+    public static void setUpAll() {
+        SelenideLogger.addListener("allure", new AllureSelenide());
     }
 
+    //Тестируемая функциональность: если заполнить форму
+    //повторно теми же данными за исключением "Даты встречи",
+    //то система предложит перепланировать время встречи.
     @Test
-    @DisplayName("Should successful plan and replan meeting")
-    public void shouldSuccessfulPlanAndReplanMeeting() {
-        UserInfo userInfo = DataGenerator.Registration.generateUser("Ru");
+    public void shouldSuccessfulFormSubmission() {
+        open("http://localhost:9999");
+        DataGenerator.UserData userData = DataGenerator.Registration.generateUser("Ru");
         //Заполнение и первоначальная отправка формы:
-        $("[data-test-id=city] input").setValue(userInfo.getCity());
+        $("[data-test-id=city] input").setValue(userData.getCity());
         $("[data-test-id=date] input").doubleClick().sendKeys(Keys.DELETE);
-        String scheduledDate = DataGenerator.generateDate(3);   //Запланированная дата (текущая дата + 3 дня)
+        //Запланированная дата (текущая дата + 4 дня):
+        String scheduledDate = DataGenerator.generateDate(4);
         $("[data-test-id=date] input").setValue(scheduledDate);
-        $("[data-test-id=name] input").setValue(userInfo.getName());
-        $("[data-test-id=phone] input").setValue(userInfo.getPhone());
+        $("[data-test-id=name] input").setValue(userData.getName());
+        $("[data-test-id=phone] input").setValue(userData.getPhone());
         $("[data-test-id=agreement]").click();
         $(".button").shouldHave(Condition.text("Запланировать")).click();
         //Проверка на видимость, содержание текста и время загрузки:
         $("[data-test-id=success-notification]").shouldBe(Condition.visible)
                 .shouldHave(Condition.text("Успешно! Встреча успешно запланирована на " + scheduledDate),
                         Duration.ofSeconds(15));
-        //Изменение раннее введенной даты и отправка формы:
+        //Изменение ранне введенной даты и отправка формы:
         $("[data-test-id=date] input").doubleClick().sendKeys(Keys.DELETE);
-        String rescheduledDate = DataGenerator.generateDate(12);   //Перенесенная дата (текущая дата + 14 дней)
+        //Перенесенная дата (текущая дата + 14 дней):
+        String rescheduledDate = DataGenerator.generateDate(14);
         $("[data-test-id=date] input").setValue(rescheduledDate);
         $(".button").shouldHave(Condition.text("Запланировать")).click();
-        //Перепланирование даты встречи,
+        //Взаимодействие с опцией перепланировки,
         //а также проверка на видимость, содержание текста и время загрузки:
         $("[data-test-id=replan-notification]").shouldBe(Condition.visible)
                 .shouldHave(Condition.text("Необходимо подтверждение" +
                                 " У вас уже запланирована встреча на другую дату. Перепланировать?"),
                         Duration.ofSeconds(15));
-        $("[data-test-id=replan-notification] .button").shouldHave(Condition.text("Перепланировать")).click();
+        $("[data-test-id=replan-notification] .button")
+                .shouldHave(Condition.text("Перепланировать")).click();
         //Итоговая проверка на видимость, содержание текста и время загрузки:
         $("[data-test-id=success-notification]").shouldBe(Condition.visible)
                 .shouldHave(Condition.text("Успешно! Встреча успешно запланирована на " + rescheduledDate),
                         Duration.ofSeconds(15));
+    }
+
+    @AfterAll
+    public static void tearDownAll() {
+        SelenideLogger.removeListener("allure");
     }
 }
